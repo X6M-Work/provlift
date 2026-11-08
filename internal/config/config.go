@@ -43,6 +43,16 @@ type Config struct {
 	} `yaml:"terraform"`
 
 	Providers ProviderRules `yaml:"providers"`
+
+	explicitBinary string
+}
+
+// ExplicitBinary returns the binary configured in .provlift.yaml, or "" if not explicitly set.
+func (c *Config) ExplicitBinary() string {
+	if c == nil {
+		return ""
+	}
+	return c.explicitBinary
 }
 
 // ProviderRules holds per-provider policy.
@@ -88,7 +98,7 @@ func Load(root string) (*Config, error) {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
-	cfg := Default()
+	cfg := &Config{Platforms: append([]string(nil), DefaultPlatforms...)}
 	// KnownFields rejects typos rather than silently ignoring a misspelled key
 	// that would otherwise disable a safety rule.
 	dec := yaml.NewDecoder(strings.NewReader(string(raw)))
@@ -106,6 +116,7 @@ func Load(root string) (*Config, error) {
 	if len(cfg.Platforms) == 0 {
 		cfg.Platforms = append([]string(nil), DefaultPlatforms...)
 	}
+	cfg.explicitBinary = cfg.Terraform.Binary
 	if cfg.Terraform.Binary == "" {
 		cfg.Terraform.Binary = "terraform"
 	}
