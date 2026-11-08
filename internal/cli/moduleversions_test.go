@@ -120,3 +120,39 @@ func TestUpgradeIsQuietWhenModulesDidNotMove(t *testing.T) {
 		})
 	}
 }
+
+func TestUpgradeReportsUnreadableModuleManifestAfterInit(t *testing.T) {
+	// JSON output and PR body
+	result := runModuleUpgrade(t, moduleManifest("5.1.0"), "{corrupt-json")
+
+	if len(result.ModuleVersions.Changes) != 0 {
+		t.Errorf("changes = %+v, want none when manifest is unreadable", result.ModuleVersions.Changes)
+	}
+	if len(result.ModuleVersions.NoBaseline) != 0 {
+		t.Errorf("no_baseline = %v, want none when manifest is unreadable", result.ModuleVersions.NoBaseline)
+	}
+	if len(result.ModuleVersions.Unreadable) != 1 {
+		t.Fatalf("unreadable = %+v, want 1 unreadable root", result.ModuleVersions.Unreadable)
+	}
+	if u := result.ModuleVersions.Unreadable[0]; u.Root == "" || u.Error == "" {
+		t.Errorf("unreadable[0] = %+v, want non-empty root and error", u)
+	}
+	body := result.PullRequest.Body
+	if !strings.Contains(body, "## Module versions") || !strings.Contains(body, "Module selections could not be read after init") {
+		t.Errorf("pull request body does not report unreadable module manifest:\n%s", body)
+	}
+
+	// Text output
+	h := newHarness(t, map[string]string{".terraform/modules/modules.json": moduleManifest("5.1.0")})
+	useFakeTerraform(t, h)
+	t.Setenv(fakeModuleManifest, "{corrupt-json")
+	h.opts.jsonOut = false
+
+	if err := h.run(t, newUpgradeCommand(h.opts), "--provider", "azurerm", "--to", "4.81.0", "--level", "minor"); err != nil {
+		t.Fatalf("upgrade (text): %v", err)
+	}
+	textOut := h.stdout.String()
+	if !strings.Contains(textOut, "Module versions") || !strings.Contains(textOut, "module selections could not be read after init:") {
+		t.Errorf("text output does not report unreadable module manifest:\n%s", textOut)
+	}
+}

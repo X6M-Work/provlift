@@ -253,7 +253,7 @@ also exit nonzero and are reported on stderr:
   "plan": { "actions": [], "skipped": [] },
   "changed_files": [],
   "terraform_runs": [],
-  "module_versions": { "changes": [], "no_baseline": [] },
+  "module_versions": { "changes": [], "no_baseline": [], "unreadable": [] },
   "pull_request": { "branch": "", "title": "", "labels": [], "body": "" }
 }
 ```
@@ -273,8 +273,10 @@ that. `TF_DATA_DIR` is honoured when locating the manifest.
 Only registry modules record a version; local and git sources are fixed by
 their path or ref. `no_baseline` lists roots that call versioned modules but
 had no earlier selection on disk, such as a fresh checkout, where a change
-cannot be detected. The same information appears in the text output and in
-the generated pull request description.
+cannot be detected. `unreadable` lists roots whose post-init `modules.json`
+manifest could not be read or parsed, along with the error reason. The same
+information appears in the text output and in the generated pull request
+description.
 
 ### Pull request metadata
 
