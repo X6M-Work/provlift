@@ -152,6 +152,6 @@
 - `terraform plan` is not run by default, so runtime-only breaks surface in CI.
 - Provider upgrade guides are linked, not parsed; there is no cross-provider API
   for them.
-- Terragrunt-generated configuration is not evaluated.
+- Terragrunt-generated configuration is not evaluated; directories that contain only `terragrunt.hcl` produce an info diagnostic, and `.terragrunt-cache` directories are skipped.
 
 ---

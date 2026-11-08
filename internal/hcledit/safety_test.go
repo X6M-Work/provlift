@@ -285,7 +285,7 @@ func TestApplyRejectsSymlinkBackup(t *testing.T) {
 func TestRecoverSkipsGeneratedDirectories(t *testing.T) {
 	isolateJournal(t)
 	dir := t.TempDir()
-	excluded := []string{".git", ".terraform", ".terragrunt", ".idea", ".vscode", "node_modules", ".backup", "custom", filepath.Join("envs", "dev", "ignored")}
+	excluded := []string{".git", ".terraform", ".terragrunt", ".terragrunt-cache", ".idea", ".vscode", "node_modules", ".backup", "custom", filepath.Join("envs", "dev", "ignored")}
 	for _, name := range excluded {
 		generated := filepath.Join(dir, name)
 		if err := os.MkdirAll(generated, 0o755); err != nil {
