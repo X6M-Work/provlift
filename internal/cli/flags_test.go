@@ -309,6 +309,50 @@ func TestUpgradeReportsScanDiagnostics(t *testing.T) {
 	}
 }
 
+func TestTerragruntDiagnosticsInListTableAndJSON(t *testing.T) {
+	h := newHarness(t, map[string]string{
+		"main.tf":                 "terraform {}\n",
+		"live/app/terragrunt.hcl": `generate "provider" {}`,
+	})
+
+	// 1. Table output: info diagnostic printed to stderr
+	if err := h.runWithGlobalFlags(newListCommand(h.opts)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(h.stderr.String(), "[info] live/app/terragrunt.hcl: Terragrunt configuration is not evaluated") {
+		t.Errorf("list stderr missing terragrunt diagnostic:\n%s", h.stderr.String())
+	}
+
+	// 2. JSON output: diagnostic included in JSON payload
+	h.stdout.Reset()
+	h.stderr.Reset()
+	if err := h.runWithGlobalFlags(newListCommand(h.opts), "--json"); err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		Diagnostics []struct {
+			Severity string `json:"severity"`
+			Summary  string `json:"summary"`
+			Position struct {
+				File string `json:"file"`
+			} `json:"position"`
+		} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal(h.stdout.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshaling json: %v\nstdout: %s", err, h.stdout.String())
+	}
+	found := false
+	for _, d := range resp.Diagnostics {
+		if d.Position.File == "live/app/terragrunt.hcl" && d.Severity == "info" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("diagnostics in JSON missing terragrunt diagnostic: %+v", resp.Diagnostics)
+	}
+}
+
 func TestValidateFlagsHaveObservableEffects(t *testing.T) {
 	newRepo := func(t *testing.T) (*harness, string) {
 		h := newHarness(t, map[string]string{

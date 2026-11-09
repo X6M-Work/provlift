@@ -73,7 +73,7 @@ discover → read locks → resolve versions → classify → plan → edit → 
 
 1. **Discover** — walk the repo, parse `required_providers` with the HCL library
    (never regex). Skip `.git`, `.terraform`, `node_modules`, `.idea`, `.vscode`,
-   `.terragrunt`, plus configured excludes. A directory referenced by another
+   `.terragrunt`, `.terragrunt-cache`, plus configured excludes. A directory referenced by another
    module's local `source = "./..."` is marked a **child**.
 2. **Read locks** — parse `.terraform.lock.hcl` where present.
 3. **Resolve versions** — registry protocol: service discovery at
@@ -228,7 +228,7 @@ from overriding an operator's trusted environment-selected executable.
 - Constraints using `!=` or multiple disjoint ranges are refused by design.
 - `terraform plan` is not run by default, so runtime-only breaks surface later.
 - Provider upgrade guides are linked, not parsed — there is no cross-provider API.
-- Terragrunt-generated configuration is not evaluated.
+- Terragrunt-generated configuration is not evaluated. Directories that contain only `terragrunt.hcl` produce an info diagnostic, and `.terragrunt-cache` directories are skipped.
 
 ## 8. Output contracts
 
