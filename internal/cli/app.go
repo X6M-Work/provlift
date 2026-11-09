@@ -99,6 +99,10 @@ func (g *globalOptions) open() (*workspace, error) {
 	if g.tfBinary != "" {
 		cfg.Terraform.Binary = g.tfBinary
 	} else if envBinary := os.Getenv("PROVLIFT_TERRAFORM_BIN"); envBinary != "" {
+		if repoBinary := cfg.ExplicitBinary(); repoBinary != "" && repoBinary != envBinary {
+			fmt.Fprintf(g.stderr(), "warning: PROVLIFT_TERRAFORM_BIN=%s overrides terraform.binary: %s from %s\n",
+				envBinary, repoBinary, config.FileName)
+		}
 		cfg.Terraform.Binary = envBinary
 	}
 
