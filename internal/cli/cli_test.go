@@ -384,14 +384,15 @@ func TestCheckWarnsOnCrossNamespaceProviderSelector(t *testing.T) {
 
 func TestOpenUsesEnvironmentBinaryUnlessFlagOverrides(t *testing.T) {
 	for _, tc := range []struct {
-		name, config, environment, flag, want string
+		name, config, environment, flag, want, wantStderr string
 	}{
-		{"default", "", "", "", "terraform"},
-		{"repository", "tofu", "", "", "tofu"},
-		{"environment over default", "", "custom-terraform", "", "custom-terraform"},
-		{"environment over repository", "tofu", "custom-terraform", "", "custom-terraform"},
-		{"flag over environment", "", "custom-terraform", "explicit-terraform", "explicit-terraform"},
-		{"flag over both", "tofu", "custom-terraform", "explicit-terraform", "explicit-terraform"},
+		{"default", "", "", "", "terraform", ""},
+		{"repository", "tofu", "", "", "tofu", ""},
+		{"environment over default", "", "custom-terraform", "", "custom-terraform", ""},
+		{"environment over repository", "tofu", "custom-terraform", "", "custom-terraform", "warning: PROVLIFT_TERRAFORM_BIN=custom-terraform overrides terraform.binary: tofu from .provlift.yaml\n"},
+		{"environment matches repository", "tofu", "tofu", "", "tofu", ""},
+		{"flag over environment", "", "custom-terraform", "explicit-terraform", "explicit-terraform", ""},
+		{"flag over both", "tofu", "custom-terraform", "explicit-terraform", "explicit-terraform", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("PROVLIFT_TERRAFORM_BIN", tc.environment)
@@ -407,6 +408,9 @@ func TestOpenUsesEnvironmentBinaryUnlessFlagOverrides(t *testing.T) {
 			}
 			if ws.cfg.Terraform.Binary != tc.want {
 				t.Fatalf("binary = %q, want %q", ws.cfg.Terraform.Binary, tc.want)
+			}
+			if gotStderr := h.stderr.String(); gotStderr != tc.wantStderr {
+				t.Fatalf("stderr = %q, want %q", gotStderr, tc.wantStderr)
 			}
 		})
 	}
