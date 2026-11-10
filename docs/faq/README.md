@@ -97,7 +97,7 @@ This design decision is intentional:
 - `provlift check` queries the public or private provider registry HTTP APIs to read release lists.
 - `provlift upgrade` and `provlift validate` run `terraform init -backend=false`, `terraform providers lock`, and `terraform validate`. They do not connect to remote state backends or cloud provider APIs.
 
-See [Prerequisites](../installation/README.md#2-prerequisites) and [Least privilege & token hygiene](../ci-cd/README.md#114-least-privilege-and-token-hygiene).
+See [Prerequisites](../installation/README.md#2-prerequisites) and [Authentication](../authentication/README.md) for private registry tokens.
 
 ### Why did `upgrade` pick a version below `LATEST`?
 
@@ -107,7 +107,7 @@ When `provlift check` shows a newer version available (e.g. `LATEST: 5.40.0`), `
 2. **Upgrade budget flags**: Flags like `--level patch`, `--level minor`, or `--exact-level` constrain the upgrade scope.
 3. **Major version guardrails**: `provlift` never upgrades across major version boundaries unless `--allow-major` or `--next-major` is explicitly specified.
 
-See [Upgrade behavior](../upgrade/README.md#8-version-selection).
+See [Dependency ceilings](../architecture/README.md#dependency-ceilings), [Incremental upgrades](../upgrade/README.md#incremental-upgrades) and [Major upgrades](../upgrade/README.md#78-major-upgrades).
 
 ### Why is there no lock file in my shared module?
 
