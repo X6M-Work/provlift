@@ -73,7 +73,7 @@ discover → read locks → resolve versions → classify → plan → edit → 
 
 1. **Discover** — walk the repo, parse `required_providers` with the HCL library
    (never regex). Skip `.git`, `.terraform`, `node_modules`, `.idea`, `.vscode`,
-   `.terragrunt`, plus configured excludes. A directory referenced by another
+   `.terragrunt`, `.terragrunt-cache`, plus configured excludes. A directory referenced by another
    module's local `source = "./..."` is marked a **child**.
 2. **Read locks** — parse `.terraform.lock.hcl` where present.
 3. **Resolve versions** — registry protocol: service discovery at
@@ -228,7 +228,7 @@ from overriding an operator's trusted environment-selected executable.
 - Constraints using `!=` or multiple disjoint ranges are refused by design.
 - `terraform plan` is not run by default, so runtime-only breaks surface later.
 - Provider upgrade guides are linked, not parsed — there is no cross-provider API.
-- Terragrunt-generated configuration is not evaluated.
+- Terragrunt-generated configuration is not evaluated. Directories that contain only `terragrunt.hcl` produce an info diagnostic, and `.terragrunt-cache` directories are skipped.
 
 ## 8. Output contracts
 
@@ -237,8 +237,8 @@ from overriding an operator's trusted environment-selected executable.
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Error, or a refused/unsupported operation |
-| 2 | `--exit-code` set and upgrades are available |
+| 1 | Error, a refused/unsupported operation, or `check --exit-code` with one or more registry lookup failures |
+| 2 | `--exit-code` set, upgrades are available, and all registry lookups succeeded |
 | 3 | Terraform validation failed |
 
 ### `upgrade --json`
@@ -253,7 +253,7 @@ also exit nonzero and are reported on stderr:
   "plan": { "actions": [], "skipped": [] },
   "changed_files": [],
   "terraform_runs": [],
-  "module_versions": { "changes": [], "no_baseline": [] },
+  "module_versions": { "changes": [], "no_baseline": [], "unreadable": [] },
   "pull_request": { "branch": "", "title": "", "labels": [], "body": "" }
 }
 ```
@@ -273,8 +273,10 @@ that. `TF_DATA_DIR` is honoured when locating the manifest.
 Only registry modules record a version; local and git sources are fixed by
 their path or ref. `no_baseline` lists roots that call versioned modules but
 had no earlier selection on disk, such as a fresh checkout, where a change
-cannot be detected. The same information appears in the text output and in
-the generated pull request description.
+cannot be detected. `unreadable` lists roots whose post-init `modules.json`
+manifest could not be read or parsed, along with the error reason. The same
+information appears in the text output and in the generated pull request
+description.
 
 ### Pull request metadata
 

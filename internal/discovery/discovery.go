@@ -23,12 +23,13 @@ import (
 // of downloaded child modules, which would otherwise be reported as first-class
 // configuration in this repository.
 var skipDirs = map[string]bool{
-	".git":         true,
-	".terraform":   true,
-	".terragrunt":  true,
-	"node_modules": true,
-	".idea":        true,
-	".vscode":      true,
+	".git":              true,
+	".terraform":        true,
+	".terragrunt":       true,
+	".terragrunt-cache": true,
+	"node_modules":      true,
+	".idea":             true,
+	".vscode":           true,
 }
 
 // Options controls a scan.
@@ -147,12 +148,15 @@ func scanDir(parser *hclparse.Parser, root, dir, registryHost string) (*model.Mo
 
 	var tfFiles []string
 	var diags []model.Diagnostic
+	hasTerragruntHCL := false
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		name := e.Name()
 		switch {
+		case name == "terragrunt.hcl":
+			hasTerragruntHCL = true
 		case strings.HasSuffix(name, ".tf.json"):
 			diags = append(diags, model.Diagnostic{
 				Severity: "warning",
@@ -165,6 +169,13 @@ func scanDir(parser *hclparse.Parser, root, dir, registryHost string) (*model.Mo
 		}
 	}
 	if len(tfFiles) == 0 {
+		if hasTerragruntHCL {
+			diags = append(diags, model.Diagnostic{
+				Severity: "info",
+				Summary:  "Terragrunt configuration is not evaluated; providers it generates are not reported (see known limitations)",
+				Pos:      model.SourcePos{File: relTo(root, filepath.Join(dir, "terragrunt.hcl"))},
+			})
+		}
 		return nil, nil, diags
 	}
 	sort.Strings(tfFiles)

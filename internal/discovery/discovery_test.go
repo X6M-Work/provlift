@@ -3,6 +3,7 @@ package discovery
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/provlift/provlift/internal/model"
@@ -179,6 +180,54 @@ func TestScanSkipsTerraformCacheDirectory(t *testing.T) {
 		if filepath.ToSlash(m.RelDir) == ".terraform/modules/cached" {
 			t.Fatal("scan descended into .terraform")
 		}
+	}
+}
+
+func TestScanSkipsTerragruntCacheDirectory(t *testing.T) {
+	inv := scanFiles(t, map[string]string{
+		"main.tf":                                "terraform {}\n",
+		"live/app/.terragrunt-cache/abc/main.tf": "terraform {\n  required_providers {\n    aws = \"~> 5.0\"\n  }\n}\n",
+		"live/app/.terragrunt/cache/main.tf":     "terraform {\n  required_providers {\n    aws = \"~> 5.0\"\n  }\n}\n",
+	})
+
+	for _, m := range inv.Modules {
+		if strings.Contains(filepath.ToSlash(m.RelDir), ".terragrunt-cache") {
+			t.Fatalf("scan descended into .terragrunt-cache: %s", m.RelDir)
+		}
+		if strings.Contains(filepath.ToSlash(m.RelDir), ".terragrunt") {
+			t.Fatalf("scan descended into .terragrunt: %s", m.RelDir)
+		}
+	}
+}
+
+func TestScanReportsTerragruntOnlyDirectories(t *testing.T) {
+	inv := scanFiles(t, map[string]string{
+		"main.tf":                 "terraform {}\n",
+		"live/app/terragrunt.hcl": "generate \"provider\" {}\n",
+		"live/db/terragrunt.hcl":  "terraform {}\n",
+		"live/db/main.tf":         "terraform {}\n", // has .tf, should NOT produce info diag
+	})
+
+	var terragruntDiags []model.Diagnostic
+	for _, d := range inv.Diagnostics {
+		if strings.Contains(d.Summary, "Terragrunt") {
+			terragruntDiags = append(terragruntDiags, d)
+		}
+	}
+
+	if len(terragruntDiags) != 1 {
+		t.Fatalf("got %d terragrunt diagnostics, want 1: %+v", len(terragruntDiags), terragruntDiags)
+	}
+
+	d := terragruntDiags[0]
+	if d.Severity != "info" {
+		t.Errorf("severity = %q, want info", d.Severity)
+	}
+	if d.Pos.File != "live/app/terragrunt.hcl" {
+		t.Errorf("file = %q, want live/app/terragrunt.hcl", d.Pos.File)
+	}
+	if !strings.Contains(d.Summary, "Terragrunt configuration is not evaluated") {
+		t.Errorf("summary = %q", d.Summary)
 	}
 }
 

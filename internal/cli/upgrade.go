@@ -118,7 +118,7 @@ func upgradeResult(dryRun bool) map[string]any {
 		"changed_files":  []string{},
 		"terraform_runs": []any{},
 		"module_versions": pullrequest.ModuleVersions{
-			Changes: []pullrequest.ModuleChange{}, NoBaseline: []string{},
+			Changes: []pullrequest.ModuleChange{}, NoBaseline: []string{}, Unreadable: []pullrequest.UnreadableRoot{},
 		},
 		"pull_request": pullrequest.Build(emptyPlan, nil, nil),
 	}
@@ -282,7 +282,11 @@ func runUpgrade(cmd *cobra.Command, g *globalOptions, opts *upgradeOptions) (out
 		result["pull_request"] = pullrequest.Build(plan, nil, reportedFiles)
 		return exitWith(ExitError, err)
 	}
-	modules := pullrequest.ModuleVersions{Changes: []pullrequest.ModuleChange{}, NoBaseline: []string{}}
+	modules := pullrequest.ModuleVersions{
+		Changes:    []pullrequest.ModuleChange{},
+		NoBaseline: []string{},
+		Unreadable: []pullrequest.UnreadableRoot{},
+	}
 	runs, runErr := applyTerraform(ctx, g, ws, plan, opts, changedFiles, &modules)
 	result["terraform_runs"] = runs
 	result["module_versions"] = modules

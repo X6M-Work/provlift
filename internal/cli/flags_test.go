@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -309,6 +310,50 @@ func TestUpgradeReportsScanDiagnostics(t *testing.T) {
 	}
 }
 
+func TestTerragruntDiagnosticsInListTableAndJSON(t *testing.T) {
+	h := newHarness(t, map[string]string{
+		"main.tf":                 "terraform {}\n",
+		"live/app/terragrunt.hcl": `generate "provider" {}`,
+	})
+
+	// 1. Table output: info diagnostic printed to stderr
+	if err := h.runWithGlobalFlags(newListCommand(h.opts)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(h.stderr.String(), "[info] live/app/terragrunt.hcl: Terragrunt configuration is not evaluated") {
+		t.Errorf("list stderr missing terragrunt diagnostic:\n%s", h.stderr.String())
+	}
+
+	// 2. JSON output: diagnostic included in JSON payload
+	h.stdout.Reset()
+	h.stderr.Reset()
+	if err := h.runWithGlobalFlags(newListCommand(h.opts), "--json"); err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		Diagnostics []struct {
+			Severity string `json:"severity"`
+			Summary  string `json:"summary"`
+			Position struct {
+				File string `json:"file"`
+			} `json:"position"`
+		} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal(h.stdout.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshaling json: %v\nstdout: %s", err, h.stdout.String())
+	}
+	found := false
+	for _, d := range resp.Diagnostics {
+		if d.Position.File == "live/app/terragrunt.hcl" && d.Severity == "info" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("diagnostics in JSON missing terragrunt diagnostic: %+v", resp.Diagnostics)
+	}
+}
+
 func TestValidateFlagsHaveObservableEffects(t *testing.T) {
 	newRepo := func(t *testing.T) (*harness, string) {
 		h := newHarness(t, map[string]string{
@@ -381,6 +426,47 @@ func TestVersionCommandJSON(t *testing.T) {
 	var info map[string]string
 	if err := json.Unmarshal(h.stdout.Bytes(), &info); err != nil || info["version"] != "1.2.3" {
 		t.Fatalf("version --json = %v: %s", err, h.stdout.String())
+	}
+}
+
+func TestVersionCommandText(t *testing.T) {
+	platform := runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH
+	for _, tc := range []struct {
+		name  string
+		build BuildInfo
+		want  string
+	}{
+		{"commit and date", BuildInfo{Version: "v0.3.1", Commit: "f8a6c44d1354-dirty", Date: "2026-10-31T20:41:17Z"},
+			"provlift v0.3.1 (commit f8a6c44d1354-dirty, built 2026-10-31T20:41:17Z, " + platform + ")\n"},
+		{"neither known", BuildInfo{Version: "v0.3.1"}, "provlift v0.3.1 (" + platform + ")\n"},
+		{"date only", BuildInfo{Version: "dev", Date: "2026-10-31T20:41:17Z"},
+			"provlift dev (built 2026-10-31T20:41:17Z, " + platform + ")\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, nil)
+			if err := h.runWithGlobalFlags(newVersionCommand(h.opts, tc.build)); err != nil {
+				t.Fatal(err)
+			}
+			if got := h.stdout.String(); got != tc.want {
+				t.Errorf("version = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVersionCommandJSONKeepsUnknownKeys(t *testing.T) {
+	h := newHarness(t, nil)
+	if err := h.runWithGlobalFlags(newVersionCommand(h.opts, BuildInfo{Version: "v0.3.1"}), "--json"); err != nil {
+		t.Fatal(err)
+	}
+	var info map[string]string
+	if err := json.Unmarshal(h.stdout.Bytes(), &info); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"commit", "date"} {
+		if value, ok := info[key]; !ok || value != "" {
+			t.Errorf("version --json %s = %q (present %v), want an empty string", key, value, ok)
+		}
 	}
 }
 

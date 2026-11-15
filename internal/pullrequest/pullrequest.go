@@ -40,6 +40,12 @@ type ModuleChange struct {
 	To     string `json:"to"`
 }
 
+// UnreadableRoot is a root module whose post-init module manifest could not be read.
+type UnreadableRoot struct {
+	Root  string `json:"root"`
+	Error string `json:"error"`
+}
+
 // ModuleVersions is what the upgrade learned about module selections.
 type ModuleVersions struct {
 	Changes []ModuleChange `json:"changes"`
@@ -47,6 +53,9 @@ type ModuleVersions struct {
 	// NoBaseline lists roots that call versioned modules but had no recorded
 	// selection before the upgrade, so a change could not be detected.
 	NoBaseline []string `json:"no_baseline"`
+
+	// Unreadable lists roots whose post-init module manifest could not be read.
+	Unreadable []UnreadableRoot `json:"unreadable"`
 }
 
 // Request is everything needed to raise a pull request.
@@ -255,7 +264,7 @@ func body(plan *upgrade.Plan, providers []providerChange, runs []TerraformRun, c
 		}
 	}
 
-	if len(modules.Changes) > 0 || len(modules.NoBaseline) > 0 {
+	if len(modules.Changes) > 0 || len(modules.NoBaseline) > 0 || len(modules.Unreadable) > 0 {
 		b.WriteString("\n## Module versions\n\n")
 		b.WriteString("`init -upgrade` re-resolves modules as well as providers. Module selections\n")
 		b.WriteString("are not committed, so CI resolves them on its own, but any Terraform commands\n")
@@ -274,6 +283,12 @@ func body(plan *upgrade.Plan, providers []providerChange, runs []TerraformRun, c
 		b.WriteString("not be detected:\n\n")
 		for _, root := range modules.NoBaseline {
 			fmt.Fprintf(&b, "- `%s`\n", root)
+		}
+	}
+	if len(modules.Unreadable) > 0 {
+		b.WriteString("\nModule selections could not be read after init for these roots:\n\n")
+		for _, u := range modules.Unreadable {
+			fmt.Fprintf(&b, "- `%s`: %s\n", u.Root, u.Error)
 		}
 	}
 

@@ -511,6 +511,10 @@ during an upgrade. Use --plan to opt in.`,
 func recordModuleChanges(modules *pullrequest.ModuleVersions, root *model.Module, before map[string]depgraph.Selection, hadBaseline bool) {
 	after, _, err := depgraph.Selections(root.Dir)
 	if err != nil {
+		modules.Unreadable = append(modules.Unreadable, pullrequest.UnreadableRoot{
+			Root:  root.RelDir,
+			Error: err.Error(),
+		})
 		return
 	}
 
@@ -553,7 +557,7 @@ func recordModuleChanges(modules *pullrequest.ModuleVersions, root *model.Module
 // printModuleVersions reports module selections that init -upgrade moved, and
 // roots where that could not be determined.
 func printModuleVersions(g *globalOptions, modules pullrequest.ModuleVersions) {
-	if len(modules.Changes) == 0 && len(modules.NoBaseline) == 0 {
+	if len(modules.Changes) == 0 && len(modules.NoBaseline) == 0 && len(modules.Unreadable) == 0 {
 		return
 	}
 	report.Section(g.stdout(), "Module versions")
@@ -567,6 +571,9 @@ func printModuleVersions(g *globalOptions, modules pullrequest.ModuleVersions) {
 	}
 	for _, root := range modules.NoBaseline {
 		fmt.Fprintf(g.stdout(), "%s: no earlier module selection was recorded, so module changes could not be detected.\n", root)
+	}
+	for _, u := range modules.Unreadable {
+		fmt.Fprintf(g.stdout(), "%s: module selections could not be read after init: %s\n", u.Root, u.Error)
 	}
 }
 
